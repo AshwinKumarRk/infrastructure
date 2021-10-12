@@ -21,3 +21,7 @@ variable "subnet_name" {
 variable "igw_name" {
   default = "csye6225-IGW"
 }
+
+variable "rt_name" {
+  default = "csye6225-RT"
+}
