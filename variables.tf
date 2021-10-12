@@ -17,3 +17,7 @@ variable "subnet_az_cidr" {
 variable "subnet_name" {
   default = "csye6225-Subnet"
 }
+
+variable "igw_name" {
+  default = "csye6225-IGW"
+}
