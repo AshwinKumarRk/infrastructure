@@ -8,3 +8,18 @@ resource "aws_vpc" "main" {
     "Name" = var.vpc_name
   }
 }
+
+resource "aws_subnet" "subnet" {
+  depends_on = [aws_vpc.main]
+
+  for_each = var.subnet_az_cidr
+
+  cidr_block              = each.value
+  vpc_id                  = aws_vpc.main.id
+  availability_zone       = each.key
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = var.subnet_name
+  }
+}
