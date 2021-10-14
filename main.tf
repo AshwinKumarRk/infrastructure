@@ -19,7 +19,7 @@ resource "aws_subnet" "subnet" {
   cidr_block              = each.value
   vpc_id                  = aws_vpc.main.id
   availability_zone       = each.key
-  map_public_ip_on_launch = true
+  map_public_ip_on_launch = var.map_public_ip
 
   tags = {
     Name = var.subnet_name
