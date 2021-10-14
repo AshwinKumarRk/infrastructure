@@ -1,10 +1,10 @@
 //Create a VPC
 resource "aws_vpc" "main" {
   cidr_block                       = var.vpc_cidr_block
-  enable_dns_hostnames             = true
-  enable_dns_support               = true
-  enable_classiclink_dns_support   = true
-  assign_generated_ipv6_cidr_block = false
+  enable_dns_hostnames             = var.dns_hostnames
+  enable_dns_support               = var.dns_support
+  enable_classiclink_dns_support   = var.classiclink
+  assign_generated_ipv6_cidr_block = var.assign_ipv6
   tags = {
     "Name" = var.vpc_name
   }

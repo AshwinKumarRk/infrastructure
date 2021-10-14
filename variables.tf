@@ -6,6 +6,22 @@ variable "vpc_cidr_block" {
   description = "CIDR for VPC"
 }
 
+variable "dns_hostnames" {
+  default = true
+}
+
+variable "dns_support" {
+  default = true
+}
+
+variable "classiclink" {
+  default = true
+}
+
+variable "assign_ipv6" {
+  default = false
+}
+
 variable "vpc_name" {
   default = "csye6225-VPC"
 }
