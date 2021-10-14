@@ -34,6 +34,10 @@ variable "subnet_name" {
   default = "csye6225-Subnet"
 }
 
+variable "map_public_ip" {
+  default = true
+}
+
 variable "igw_name" {
   default = "csye6225-IGW"
 }
