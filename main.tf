@@ -56,13 +56,14 @@ resource "aws_route_table_association" "rta" {
   route_table_id = aws_route_table.rt.id
 }
 
-//Create Security Group
+//Create Application Security Group
 resource "aws_security_group" "app_pub_sg" {
   name        = var.app_pub_sg_name
   description = var.app_pub_sg_desc
   vpc_id      = aws_vpc.main.id
 }
 
+//Add http SG rule
 resource "aws_security_group_rule" "http" {
   type              = "ingress"
   from_port         = 80
@@ -72,6 +73,7 @@ resource "aws_security_group_rule" "http" {
   security_group_id = aws_security_group.app_pub_sg.id
 }
 
+//Add https SG rule
 resource "aws_security_group_rule" "https" {
   type              = "ingress"
   from_port         = 443
@@ -81,6 +83,7 @@ resource "aws_security_group_rule" "https" {
   security_group_id = aws_security_group.app_pub_sg.id
 }
 
+//Add ssh SG rule
 resource "aws_security_group_rule" "ssh" {
   type              = "ingress"
   from_port         = 22
@@ -90,6 +93,7 @@ resource "aws_security_group_rule" "ssh" {
   security_group_id = aws_security_group.app_pub_sg.id
 }
 
+//Add localhost SG rule
 resource "aws_security_group_rule" "localhost" {
   type              = "ingress"
   from_port         = 3000
@@ -118,5 +122,12 @@ resource "aws_security_group" "db_pub_sg" {
     to_port         = 3306
     protocol        = "tcp"
     security_groups = [aws_security_group.app_pub_sg.id]
+  }
+
+    egress {
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
