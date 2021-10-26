@@ -45,3 +45,11 @@ variable "igw_name" {
 variable "rt_name" {
   default = "csye6225-RT"
 }
+
+variable "app_pub_sg_name" {
+  default = "application"
+}
+
+variable "app_pub_sg_desc" {
+  default = "Application Security Group for EC2 WebApp"
+}
