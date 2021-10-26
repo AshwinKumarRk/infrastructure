@@ -124,10 +124,60 @@ resource "aws_security_group" "db_pub_sg" {
     security_groups = [aws_security_group.app_pub_sg.id]
   }
 
-    egress {
-    from_port       = 0
-    to_port         = 0
-    protocol        = "-1"
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+}
+
+resource "random_string" "random" {
+  length  = 8
+  lower   = true
+  special = false
+  number  = false
+  upper   = false
+}
+
+resource "aws_kms_key" "mykey" {
+  description             = var.kms_desc
+  deletion_window_in_days = 1
+}
+
+resource "aws_s3_bucket" "bucket" {
+  bucket        = "${random_string.random.id}.${var.bucket_domain}"
+  acl           = "private"
+  force_destroy = true
+
+  lifecycle_rule {
+    id      = "log"
+    enabled = true
+
+    prefix = "log/"
+
+    tags = {
+      rule      = "log"
+      autoclean = "true"
+    }
+
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+  }
+
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        kms_master_key_id = aws_kms_key.mykey.arn
+        sse_algorithm     = "aws:kms"
+      }
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "s3_pab" {
+  bucket             = aws_s3_bucket.bucket.id
+  ignore_public_acls = true
 }

@@ -61,3 +61,11 @@ variable "db_pub_sg_name" {
 variable "db_pub_sg_desc" {
   default = "Database Security Group for RDS Instance"
 }
+
+variable "bucket_domain" {
+  default = "dev.ashwinkumarrk.me"
+}
+
+variable "kms_desc" {
+  default = "This key is used to encrypt bucket objects"
+}
