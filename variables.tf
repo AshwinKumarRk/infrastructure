@@ -53,3 +53,11 @@ variable "app_pub_sg_name" {
 variable "app_pub_sg_desc" {
   default = "Application Security Group for EC2 WebApp"
 }
+
+variable "db_pub_sg_name" {
+  default = "database"
+}
+
+variable "db_pub_sg_desc" {
+  default = "Database Security Group for RDS Instance"
+}

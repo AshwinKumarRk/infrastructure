@@ -58,8 +58,8 @@ resource "aws_route_table_association" "rta" {
 
 //Create Security Group
 resource "aws_security_group" "app_pub_sg" {
-  name        = "application"
-  description = "Allow application access"
+  name        = var.app_pub_sg_name
+  description = var.app_pub_sg_desc
   vpc_id      = aws_vpc.main.id
 }
 
@@ -106,4 +106,17 @@ resource "aws_security_group_rule" "outbound" {
   protocol          = "-1"
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.app_pub_sg.id
+}
+
+resource "aws_security_group" "db_pub_sg" {
+  name        = var.db_pub_sg_name
+  description = var.db_pub_sg_desc
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port       = 3306
+    to_port         = 3306
+    protocol        = "tcp"
+    security_groups = [aws_security_group.app_pub_sg.id]
+  }
 }
