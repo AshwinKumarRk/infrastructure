@@ -14,12 +14,11 @@ resource "aws_vpc" "main" {
 resource "aws_subnet" "subnet" {
   depends_on = [aws_vpc.main]
 
-  for_each = var.subnet_az_cidr
-
-  cidr_block              = each.value
+  count                   = length(var.subnet_az_cidr)
   vpc_id                  = aws_vpc.main.id
-  availability_zone       = each.key
+  cidr_block              = element(var.subnet_az_cidr, count.index)
   map_public_ip_on_launch = var.map_public_ip
+  availability_zone       = element(var.subnet_az, count.index)
 
   tags = {
     Name = var.subnet_name
@@ -43,6 +42,11 @@ resource "aws_route_table" "rt" {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.igw.id
   }
+
+  timeouts {
+    create = "3m"
+    delete = "3m"
+  }
   tags = {
     Name = var.rt_name
   }
@@ -50,16 +54,15 @@ resource "aws_route_table" "rt" {
 
 //Create route table association
 resource "aws_route_table_association" "rta" {
-  for_each = aws_subnet.subnet
-
-  subnet_id      = each.value.id
+  count          = length(var.subnet_az_cidr)
+  subnet_id      = element(aws_subnet.subnet.*.id, count.index)
   route_table_id = aws_route_table.rt.id
 }
 
 //Create Application Security Group
-resource "aws_security_group" "app_pub_sg" {
-  name        = var.app_pub_sg_name
-  description = var.app_pub_sg_desc
+resource "aws_security_group" "app_sg" {
+  name        = var.app_sg_name
+  description = var.app_sg_desc
   vpc_id      = aws_vpc.main.id
 }
 
@@ -70,7 +73,7 @@ resource "aws_security_group_rule" "http" {
   to_port           = 80
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.app_pub_sg.id
+  security_group_id = aws_security_group.app_sg.id
 }
 
 //Add https SG rule
@@ -80,7 +83,7 @@ resource "aws_security_group_rule" "https" {
   to_port           = 443
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.app_pub_sg.id
+  security_group_id = aws_security_group.app_sg.id
 }
 
 //Add ssh SG rule
@@ -90,7 +93,7 @@ resource "aws_security_group_rule" "ssh" {
   to_port           = 22
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.app_pub_sg.id
+  security_group_id = aws_security_group.app_sg.id
 }
 
 //Add localhost SG rule
@@ -100,7 +103,7 @@ resource "aws_security_group_rule" "localhost" {
   to_port           = 3000
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.app_pub_sg.id
+  security_group_id = aws_security_group.app_sg.id
 }
 
 resource "aws_security_group_rule" "outbound" {
@@ -109,19 +112,20 @@ resource "aws_security_group_rule" "outbound" {
   to_port           = 0
   protocol          = "-1"
   cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.app_pub_sg.id
+  security_group_id = aws_security_group.app_sg.id
 }
 
-resource "aws_security_group" "db_pub_sg" {
-  name        = var.db_pub_sg_name
-  description = var.db_pub_sg_desc
+#Create database security group
+resource "aws_security_group" "db_sg" {
+  name        = var.db_sg_name
+  description = var.db_sg_desc
   vpc_id      = aws_vpc.main.id
 
   ingress {
     from_port       = 3306
     to_port         = 3306
     protocol        = "tcp"
-    security_groups = [aws_security_group.app_pub_sg.id]
+    security_groups = [aws_security_group.app_sg.id]
   }
 
   egress {
@@ -132,6 +136,7 @@ resource "aws_security_group" "db_pub_sg" {
   }
 }
 
+#Create random string to use for unique bucket name creation
 resource "random_string" "random" {
   length  = 8
   lower   = true
@@ -140,11 +145,13 @@ resource "random_string" "random" {
   upper   = false
 }
 
+#kms key for s3 bucket default encryption
 resource "aws_kms_key" "mykey" {
   description             = var.kms_desc
-  deletion_window_in_days = 1
+  deletion_window_in_days = 7
 }
 
+#Create s3 bucket
 resource "aws_s3_bucket" "bucket" {
   bucket        = "${random_string.random.id}.${var.bucket_domain}"
   acl           = "private"
@@ -180,4 +187,32 @@ resource "aws_s3_bucket" "bucket" {
 resource "aws_s3_bucket_public_access_block" "s3_pab" {
   bucket             = aws_s3_bucket.bucket.id
   ignore_public_acls = true
+}
+
+resource "aws_db_parameter_group" "db_pg" {
+  name   = var.dbp_name
+  family = var.dbp_family
+}
+
+resource "aws_db_subnet_group" "db_sntg" {
+  name       = "main"
+  subnet_ids = aws_subnet.subnet.*.id
+  tags = {
+    Name = "My DB subnet group"
+  }
+}
+
+resource "aws_db_instance" "db_instance" {
+  allocated_storage      = 10
+  engine                 = var.db_engine
+  instance_class         = var.db_iclass
+  name                   = var.db_name
+  username               = var.db_user
+  password               = var.db_pass
+  identifier             = var.db_id
+  parameter_group_name   = aws_db_parameter_group.db_pg.id
+  multi_az               = false
+  db_subnet_group_name   = aws_db_subnet_group.db_sntg.name
+  vpc_security_group_ids = [aws_security_group.db_sg.id]
+  skip_final_snapshot    = true
 }
