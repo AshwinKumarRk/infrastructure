@@ -112,6 +112,21 @@ variable "db_param_gp" {
   default = "default.mysql8.0"
 }
 
+#AMI
 variable "owner_id" {}
 
-variable "keypair_name" {}
+#EC2 Instance
+variable "key" {}
+variable "instance" {
+  default = "t2.micro"
+}
+variable "delete_onterm" {
+  default = true
+}
+variable "vsize" {
+  default = 20
+}
+
+variable "vtype" {
+  default = "gp2"
+}

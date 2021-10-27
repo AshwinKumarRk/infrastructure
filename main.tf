@@ -230,15 +230,15 @@ data "aws_ami" "ami" {
 #Create EC2 Instance
 resource "aws_instance" "ec2_instance" {
   ami                         = data.aws_ami.ami.id
-  instance_type               = "t2.micro"
+  instance_type               = var.instance
   vpc_security_group_ids      = [aws_security_group.app_sg.id]
   subnet_id                   = aws_subnet.subnet[1].id
-  key_name                    = var.keypair_name
+  key_name                    = var.key
   associate_public_ip_address = true
   root_block_device {
     delete_on_termination = true
-    volume_size           = 20
-    volume_type           = "gp2"
+    volume_size           = var.vtype
+    volume_type           = var.vtype
   }
   user_data = <<-EOF
         #!/bin/bash
