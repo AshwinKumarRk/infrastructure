@@ -184,16 +184,19 @@ resource "aws_s3_bucket" "bucket" {
   }
 }
 
-resource "aws_s3_bucket_public_access_block" "s3_pab" {
+#Block public access for S3 bucket
+resource "aws_s3_bucket_public_access_block" "s3_pub_accblk" {
   bucket             = aws_s3_bucket.bucket.id
   ignore_public_acls = true
 }
 
+#Create RDS Parameter Group
 resource "aws_db_parameter_group" "db_pg" {
   name   = var.dbp_name
   family = var.dbp_family
 }
 
+#Create RDS Subnet Group
 resource "aws_db_subnet_group" "db_sntg" {
   name       = "main"
   subnet_ids = aws_subnet.subnet.*.id
@@ -202,6 +205,7 @@ resource "aws_db_subnet_group" "db_sntg" {
   }
 }
 
+#Create RDS Instance
 resource "aws_db_instance" "db_instance" {
   allocated_storage      = 10
   engine                 = var.db_engine
@@ -215,4 +219,90 @@ resource "aws_db_instance" "db_instance" {
   db_subnet_group_name   = aws_db_subnet_group.db_sntg.name
   vpc_security_group_ids = [aws_security_group.db_sg.id]
   skip_final_snapshot    = true
+}
+
+#Fetch AMI data
+data "aws_ami" "ami" {
+  most_recent = true
+  owners      = [var.owner_id]
+}
+
+#Create EC2 Instance
+resource "aws_instance" "ec2_instance" {
+  ami                         = data.aws_ami.ami.id
+  instance_type               = "t2.micro"
+  vpc_security_group_ids      = [aws_security_group.app_sg.id]
+  subnet_id                   = aws_subnet.subnet[1].id
+  key_name                    = var.keypair_name
+  associate_public_ip_address = true
+  root_block_device {
+    delete_on_termination = true
+    volume_size           = 20
+    volume_type           = "gp2"
+  }
+  user_data = <<-EOF
+        #!/bin/bash
+        sleep 30
+        sudo apt-get update
+        sleep 30
+        sudo apt-get install unzip
+        sudo echo DB_NAME="${var.db_name}"  >> /home/ubuntu/csye6225/webapp/.env
+        sudo echo DB_USER="${aws_db_instance.db_instance.username}" >> /home/ubuntu/webapp/.env
+        sudo echo DB_PASS= "${aws_db_instance.db_instance.password}" >> /home/ubuntu/webapp/.env
+        sudo echo DB_HOST= "${aws_db_instance.db_instance.address}" | sed s/:3306//g  >> /home/ubuntu/webapp/.env
+        sudo echo S3_BUCKET= "${aws_s3_bucket.bucket.bucket}" >> /home/ubuntu/webapp/.env
+        EOF
+}
+
+
+#Create IAM Role
+resource "aws_iam_role" "EC2-CSYE6225" {
+  name = "EC2-CSYE6225"
+
+  assume_role_policy = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+    {
+        "Action": "sts:AssumeRole",
+        "Principal": {
+        "Service": "ec2.amazonaws.com"
+        },
+        "Effect": "Allow",
+        "Sid": ""
+    }
+    ]
+}
+EOF
+}
+
+#Create IAM Policy
+resource "aws_iam_policy" "WebAppS3" {
+  name   = "WebAppS3"
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+      {
+          "Effect": "Allow",
+          "Action": [
+              "s3:PutObject",
+              "s3:GetObject",
+              "s3:DeleteObject",
+              "s3:PutObjectAcl"
+          ],
+          "Resource": [
+              "arn:aws:s3:::${aws_s3_bucket.bucket.bucket}",
+              "arn:aws:s3:::${aws_s3_bucket.bucket.bucket}/*"
+          ]
+      }
+  ]
+}
+EOF
+}
+
+#Attach WebAppS3 policy to EC2-CSYE6225 IAM Role
+resource "aws_iam_role_policy_attachment" "Attach_WebAppS3_to_EC2-CSYE6225" {
+  role       = aws_iam_role.EC2-CSYE6225.name
+  policy_arn = aws_iam_policy.WebAppS3.arn
 }

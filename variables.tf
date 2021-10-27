@@ -111,3 +111,7 @@ variable "db_id" {}
 variable "db_param_gp" {
   default = "default.mysql8.0"
 }
+
+variable "owner_id" {}
+
+variable "keypair_name" {}
