@@ -234,19 +234,23 @@ resource "aws_instance" "ec2_instance" {
   vpc_security_group_ids      = [aws_security_group.app_sg.id]
   subnet_id                   = aws_subnet.subnet[1].id
   key_name                    = var.key
+  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
   associate_public_ip_address = true
   root_block_device {
     delete_on_termination = true
-    volume_size           = var.vtype
+    volume_size           = var.vsize
     volume_type           = var.vtype
   }
+  #Runs following script on instance boot
   user_data = <<-EOF
         #!/bin/bash
         sleep 30
         sudo apt-get update
         sleep 30
         sudo apt-get install unzip
-        sudo echo DB_NAME="${var.db_name}"  >> /home/ubuntu/csye6225/webapp/.env
+        sudo apt install sl
+        mkdir -p /home/ubuntu/webapp/
+        sudo echo DB_NAME="${var.db_name}"  >> /home/ubuntu/webapp/.env
         sudo echo DB_USER="${aws_db_instance.db_instance.username}" >> /home/ubuntu/webapp/.env
         sudo echo DB_PASS= "${aws_db_instance.db_instance.password}" >> /home/ubuntu/webapp/.env
         sudo echo DB_HOST= "${aws_db_instance.db_instance.address}" | sed s/:3306//g  >> /home/ubuntu/webapp/.env
@@ -305,4 +309,10 @@ EOF
 resource "aws_iam_role_policy_attachment" "Attach_WebAppS3_to_EC2-CSYE6225" {
   role       = aws_iam_role.EC2-CSYE6225.name
   policy_arn = aws_iam_policy.WebAppS3.arn
+}
+
+#Attach IAM Role to EC2
+resource "aws_iam_instance_profile" "ec2_profile" {
+name = "ec2_profile"
+role = "${aws_iam_role.EC2-CSYE6225.name}"
 }
