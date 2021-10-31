@@ -145,12 +145,6 @@ resource "random_string" "random" {
   upper   = false
 }
 
-#kms key for s3 bucket default encryption
-resource "aws_kms_key" "mykey" {
-  description             = var.kms_desc
-  deletion_window_in_days = 7
-}
-
 #Create s3 bucket
 resource "aws_s3_bucket" "bucket" {
   bucket        = "${random_string.random.id}.${var.bucket_domain}"
@@ -177,7 +171,6 @@ resource "aws_s3_bucket" "bucket" {
   server_side_encryption_configuration {
     rule {
       apply_server_side_encryption_by_default {
-        kms_master_key_id = aws_kms_key.mykey.arn
         sse_algorithm     = "aws:kms"
       }
     }
@@ -250,6 +243,7 @@ resource "aws_instance" "ec2_instance" {
         sudo apt-get install unzip
         sudo apt install sl
         mkdir -p /home/ubuntu/webapp/
+        sudo chown -R ubuntu:ubuntu /home/ubuntu/webapp
         sudo echo DB_NAME="${var.db_name}"  >> /home/ubuntu/webapp/.env
         sudo echo DB_USER="${aws_db_instance.db_instance.username}" >> /home/ubuntu/webapp/.env
         sudo echo DB_PASS= "${aws_db_instance.db_instance.password}" >> /home/ubuntu/webapp/.env
