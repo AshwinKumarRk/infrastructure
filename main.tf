@@ -171,7 +171,7 @@ resource "aws_s3_bucket" "bucket" {
   server_side_encryption_configuration {
     rule {
       apply_server_side_encryption_by_default {
-        sse_algorithm     = "aws:kms"
+        sse_algorithm = "aws:kms"
       }
     }
   }
@@ -227,12 +227,15 @@ resource "aws_instance" "ec2_instance" {
   vpc_security_group_ids      = [aws_security_group.app_sg.id]
   subnet_id                   = aws_subnet.subnet[1].id
   key_name                    = var.key
-  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
+  iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
   associate_public_ip_address = true
   root_block_device {
     delete_on_termination = true
     volume_size           = var.vsize
     volume_type           = var.vtype
+  }
+  tags = {
+    Name = "webappv1"
   }
   #Runs following script on instance boot
   user_data = <<-EOF
@@ -307,6 +310,6 @@ resource "aws_iam_role_policy_attachment" "Attach_WebAppS3_to_EC2-CSYE6225" {
 
 #Attach IAM Role to EC2
 resource "aws_iam_instance_profile" "ec2_profile" {
-name = "ec2_profile"
-role = "${aws_iam_role.EC2-CSYE6225.name}"
+  name = "ec2_profile"
+  role = aws_iam_role.EC2-CSYE6225.name
 }
