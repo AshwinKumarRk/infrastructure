@@ -74,7 +74,7 @@ variable "db_sg_desc" {
 
 #s3 bucket
 variable "bucket_domain" {
-  default = "dev.ashwinkumarrk.me"
+  default = "prod.ashwinkumarrk.me"
 }
 
 variable "kms_desc" {
