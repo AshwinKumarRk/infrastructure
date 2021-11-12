@@ -308,6 +308,18 @@ resource "aws_iam_role_policy_attachment" "Attach_WebAppS3_to_EC2-CSYE6225" {
   policy_arn = aws_iam_policy.WebAppS3.arn
 }
 
+#Attach CloudWatch Agent policy to EC2-CSYE6225 IAM Role
+resource "aws_iam_role_policy_attachment" "Attach_CWAgent_to_EC2-CSYE6225" {
+  role       = aws_iam_role.EC2-CSYE6225.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+#Attach SSM Managed Instance Core policy to EC2-CSYE6225 IAM Role
+resource "aws_iam_role_policy_attachment" "Attach_SSM_to_EC2-CSYE6225" {
+  role       = aws_iam_role.EC2-CSYE6225.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
 #Attach IAM Role to EC2
 resource "aws_iam_instance_profile" "ec2_profile" {
   name = "ec2_profile"
