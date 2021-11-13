@@ -357,6 +357,8 @@ resource "aws_autoscaling_group" "asg_group" {
   min_size             = 3
   default_cooldown     = 60
   launch_configuration = aws_launch_configuration.asg_launch_config.name
+  vpc_zone_identifier  = [aws_subnet.subnet[1].id]
+  target_group_arns    = [aws_lb_target_group.lb_target_grp.arn]
   tag {
     key                 = "Name"
     value               = "webappv1"
@@ -378,4 +380,56 @@ resource "aws_autoscaling_policy" "ASG_Scale_Down_Policy" {
   adjustment_type        = "ChangeInCapacity"
   cooldown               = 60
   autoscaling_group_name = aws_autoscaling_group.asg_group.name
+}
+
+resource "aws_security_group" "lb_sg" {
+  name   = "Application Load Balancer Security Group"
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name        = "Application Load Balancer Security Group"
+    Environment = var.profile
+  }
+}
+
+resource "aws_lb" "load_balancer" {
+  name               = "Application Load Balancer"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.lb_sg.id]
+  subnets            = aws_subnet.subnet.*.id
+  tags = {
+    Environment = var.profile
+    Name        = "Application Load Balancer"
+  }
+}
+
+resource "aws_lb_target_group" "lb_target_grp" {
+  name     = "ALB Target Group"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+}
+
+resource "aws_lb_listener" "lb_listener" {
+  load_balancer_arn = aws_lb.load_balancer.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.lb_target_grp.arn
+  }
 }
