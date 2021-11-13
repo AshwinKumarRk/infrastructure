@@ -325,3 +325,111 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   name = "ec2_profile"
   role = aws_iam_role.EC2-CSYE6225.name
 }
+
+resource "aws_launch_configuration" "asg_launch_config" {
+  name                        = "asg_launch_config"
+  image_id                    = data.aws_ami.ubuntu.id
+  instance_type               = "t2.micro"
+  key_name                    = var.key
+  associate_public_ip_address = true
+  iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
+  security_groups             = [aws_security_group.app_sg.id]
+  user_data                   = <<-EOF
+      #!/bin/bash
+      sleep 30
+      sudo apt-get update
+      sleep 30
+      sudo apt-get install unzip
+      sudo apt install sl
+      mkdir -p /home/ubuntu/webapp/
+      sudo chown -R ubuntu:ubuntu /home/ubuntu/webapp
+      sudo echo DB_NAME="${var.db_name}"  >> /home/ubuntu/webapp/.env
+      sudo echo DB_USER="${aws_db_instance.db_instance.username}" >> /home/ubuntu/webapp/.env
+      sudo echo DB_PASS= "${aws_db_instance.db_instance.password}" >> /home/ubuntu/webapp/.env
+      sudo echo DB_HOST= "${aws_db_instance.db_instance.address}" | sed s/:3306//g  >> /home/ubuntu/webapp/.env
+      sudo echo S3_BUCKET= "${aws_s3_bucket.bucket.bucket}" >> /home/ubuntu/webapp/.env
+        EOF
+}
+resource "aws_autoscaling_group" "asg_group" {
+  name                 = "asg_group"
+  desired_capacity     = 3
+  max_size             = 5
+  min_size             = 3
+  default_cooldown     = 60
+  launch_configuration = aws_launch_configuration.asg_launch_config.name
+  vpc_zone_identifier  = [aws_subnet.subnet[1].id]
+  target_group_arns    = [aws_lb_target_group.lb_target_grp.arn]
+  tag {
+    key                 = "Name"
+    value               = "webappv1"
+    propagate_at_launch = true
+  }
+}
+
+resource "aws_autoscaling_policy" "ASG_Scale_Up_Policy" {
+  name                   = "ASG_Scale_Up_Policy"
+  scaling_adjustment     = 1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 60
+  autoscaling_group_name = aws_autoscaling_group.asg_group.name
+}
+
+resource "aws_autoscaling_policy" "ASG_Scale_Down_Policy" {
+  name                   = "ASG_Scale_Down_Policy"
+  scaling_adjustment     = -1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 60
+  autoscaling_group_name = aws_autoscaling_group.asg_group.name
+}
+
+resource "aws_security_group" "lb_sg" {
+  name   = "Application Load Balancer Security Group"
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name        = "Application Load Balancer Security Group"
+    Environment = var.profile
+  }
+}
+
+resource "aws_lb" "load_balancer" {
+  name               = "Application Load Balancer"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.lb_sg.id]
+  subnets            = aws_subnet.subnet.*.id
+  tags = {
+    Environment = var.profile
+    Name        = "Application Load Balancer"
+  }
+}
+
+resource "aws_lb_target_group" "lb_target_grp" {
+  name     = "ALB Target Group"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+}
+
+resource "aws_lb_listener" "lb_listener" {
+  load_balancer_arn = aws_lb.load_balancer.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.lb_target_grp.arn
+  }
+}
