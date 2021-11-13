@@ -350,8 +350,8 @@ resource "aws_launch_configuration" "asg_launch_config" {
       sudo echo S3_BUCKET= "${aws_s3_bucket.bucket.bucket}" >> /home/ubuntu/webapp/.env
         EOF
 }
-resource "aws_autoscaling_group" "asg_group" {
-  name                 = "asg_group"
+resource "aws_autoscaling_group" "asg" {
+  name                 = "asg"
   desired_capacity     = 3
   max_size             = 5
   min_size             = 3
