@@ -221,39 +221,39 @@ data "aws_ami" "ami" {
 }
 
 #Create EC2 Instance
-resource "aws_instance" "ec2_instance" {
-  ami                         = data.aws_ami.ami.id
-  instance_type               = var.instance
-  vpc_security_group_ids      = [aws_security_group.app_sg.id]
-  subnet_id                   = aws_subnet.subnet[1].id
-  key_name                    = var.key
-  iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
-  associate_public_ip_address = true
-  root_block_device {
-    delete_on_termination = true
-    volume_size           = var.vsize
-    volume_type           = var.vtype
-  }
-  tags = {
-    Name = "webappv1"
-  }
-  #Runs following script on instance boot
-  user_data = <<-EOF
-        #!/bin/bash
-        sleep 30
-        sudo apt-get update
-        sleep 30
-        sudo apt-get install unzip
-        sudo apt install sl
-        mkdir -p /home/ubuntu/webapp/
-        sudo chown -R ubuntu:ubuntu /home/ubuntu/webapp
-        sudo echo DB_NAME="${var.db_name}"  >> /home/ubuntu/webapp/.env
-        sudo echo DB_USER="${aws_db_instance.db_instance.username}" >> /home/ubuntu/webapp/.env
-        sudo echo DB_PASS= "${aws_db_instance.db_instance.password}" >> /home/ubuntu/webapp/.env
-        sudo echo DB_HOST= "${aws_db_instance.db_instance.address}" | sed s/:3306//g  >> /home/ubuntu/webapp/.env
-        sudo echo S3_BUCKET= "${aws_s3_bucket.bucket.bucket}" >> /home/ubuntu/webapp/.env
-        EOF
-}
+// resource "aws_instance" "ec2_instance" {
+//   ami                         = data.aws_ami.ami.id
+//   instance_type               = var.instance
+//   vpc_security_group_ids      = [aws_security_group.app_sg.id]
+//   subnet_id                   = aws_subnet.subnet[1].id
+//   key_name                    = var.key
+//   iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
+//   associate_public_ip_address = true
+//   root_block_device {
+//     delete_on_termination = true
+//     volume_size           = var.vsize
+//     volume_type           = var.vtype
+//   }
+//   tags = {
+//     Name = "webappv1"
+//   }
+//   #Runs following script on instance boot
+//   user_data = <<-EOF
+//         #!/bin/bash
+//         sleep 30
+//         sudo apt-get update
+//         sleep 30
+//         sudo apt-get install unzip
+//         sudo apt install sl
+//         mkdir -p /home/ubuntu/webapp/
+//         sudo chown -R ubuntu:ubuntu /home/ubuntu/webapp
+//         sudo echo DB_NAME="${var.db_name}"  >> /home/ubuntu/webapp/.env
+//         sudo echo DB_USER="${aws_db_instance.db_instance.username}" >> /home/ubuntu/webapp/.env
+//         sudo echo DB_PASS= "${aws_db_instance.db_instance.password}" >> /home/ubuntu/webapp/.env
+//         sudo echo DB_HOST= "${aws_db_instance.db_instance.address}" | sed s/:3306//g  >> /home/ubuntu/webapp/.env
+//         sudo echo S3_BUCKET= "${aws_s3_bucket.bucket.bucket}" >> /home/ubuntu/webapp/.env
+//         EOF
+// }
 
 
 #Create IAM Role
@@ -328,7 +328,7 @@ resource "aws_iam_instance_profile" "ec2_profile" {
 
 resource "aws_launch_configuration" "asg_launch_config" {
   name                        = "asg_launch_config"
-  image_id                    = data.aws_ami.ubuntu.id
+  image_id                    = data.aws_ami.ami.id
   instance_type               = "t2.micro"
   key_name                    = var.key
   associate_public_ip_address = true
@@ -350,8 +350,8 @@ resource "aws_launch_configuration" "asg_launch_config" {
       sudo echo S3_BUCKET= "${aws_s3_bucket.bucket.bucket}" >> /home/ubuntu/webapp/.env
         EOF
 }
-resource "aws_autoscaling_group" "asg_group" {
-  name                 = "asg_group"
+resource "aws_autoscaling_group" "asg" {
+  name                 = "asg"
   desired_capacity     = 3
   max_size             = 5
   min_size             = 3
@@ -371,7 +371,7 @@ resource "aws_autoscaling_policy" "ASG_Scale_Up_Policy" {
   scaling_adjustment     = 1
   adjustment_type        = "ChangeInCapacity"
   cooldown               = 60
-  autoscaling_group_name = aws_autoscaling_group.asg_group.name
+  autoscaling_group_name = aws_autoscaling_group.asg.name
 }
 
 resource "aws_autoscaling_policy" "ASG_Scale_Down_Policy" {
@@ -379,7 +379,7 @@ resource "aws_autoscaling_policy" "ASG_Scale_Down_Policy" {
   scaling_adjustment     = -1
   adjustment_type        = "ChangeInCapacity"
   cooldown               = 60
-  autoscaling_group_name = aws_autoscaling_group.asg_group.name
+  autoscaling_group_name = aws_autoscaling_group.asg.name
 }
 
 resource "aws_security_group" "lb_sg" {
@@ -405,20 +405,20 @@ resource "aws_security_group" "lb_sg" {
 }
 
 resource "aws_lb" "load_balancer" {
-  name               = "Application Load Balancer"
+  name               = "Application-Load-Balancer"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.lb_sg.id]
   subnets            = aws_subnet.subnet.*.id
   tags = {
     Environment = var.profile
-    Name        = "Application Load Balancer"
+    Name        = "Application-Load-Balancer"
   }
 }
 
 resource "aws_lb_target_group" "lb_target_grp" {
-  name     = "ALB Target Group"
-  port     = 80
+  name     = "ALB-Target-Group"
+  port     = "3000"
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
 }
@@ -432,4 +432,40 @@ resource "aws_lb_listener" "lb_listener" {
     type             = "forward"
     target_group_arn = aws_lb_target_group.lb_target_grp.arn
   }
+}
+
+resource "aws_cloudwatch_metric_alarm" "CPU_Usage_Low" {
+  alarm_name          = "CPU-Usage-Low"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = "1"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "60"
+  statistic           = "Average"
+  threshold           = "3"
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.asg.name
+  }
+
+  alarm_description = "Scales down if CPU Usage below 3%"
+  alarm_actions     = [aws_autoscaling_policy.ASG_Scale_Down_Policy.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "CPU_Usage_High" {
+  alarm_name          = "CPU-Usage-High"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "1"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "60"
+  statistic           = "Average"
+  threshold           = "5"
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.asg.name
+  }
+
+  alarm_description = "Scales up if CPU Usage above 5%"
+  alarm_actions     = [aws_autoscaling_policy.ASG_Scale_Up_Policy.arn]
 }
