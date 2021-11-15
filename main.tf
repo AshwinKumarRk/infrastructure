@@ -348,6 +348,7 @@ resource "aws_launch_configuration" "asg_launch_config" {
       sudo echo DB_PASS= "${aws_db_instance.db_instance.password}" >> /home/ubuntu/webapp/.env
       sudo echo DB_HOST= "${aws_db_instance.db_instance.address}" | sed s/:3306//g  >> /home/ubuntu/webapp/.env
       sudo echo S3_BUCKET= "${aws_s3_bucket.bucket.bucket}" >> /home/ubuntu/webapp/.env
+      sudo touch check.txt
         EOF
 }
 resource "aws_autoscaling_group" "asg" {
@@ -469,3 +470,11 @@ resource "aws_cloudwatch_metric_alarm" "CPU_Usage_High" {
   alarm_description = "Scales up if CPU Usage above 5%"
   alarm_actions     = [aws_autoscaling_policy.ASG_Scale_Up_Policy.arn]
 }
+
+// resource "aws_autoscaling_lifecycle_hook" "asg_lh" {
+//   name                   = "ASG-Lifecycle-Hook"
+//   autoscaling_group_name = aws_autoscaling_group.asg.name
+//   default_result         = "CONTINUE"
+//   heartbeat_timeout      = 300
+//   lifecycle_transition   = "autoscaling:EC2_INSTANCE_LAUNCHING"
+// }
