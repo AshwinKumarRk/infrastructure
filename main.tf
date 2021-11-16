@@ -61,58 +61,45 @@ resource "aws_route_table_association" "rta" {
 
 //Create Application Security Group
 resource "aws_security_group" "app_sg" {
-  name        = var.app_sg_name
-  description = var.app_sg_desc
-  vpc_id      = aws_vpc.main.id
-}
+  vpc_id = aws_vpc.main.id
+  name   = "application"
 
-//Add http SG rule
-resource "aws_security_group_rule" "http" {
-  type              = "ingress"
-  from_port         = 80
-  to_port           = 80
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.app_sg.id
-}
+  # allow SSH port
+  ingress {
+    cidr_blocks = ["0.0.0.0/0"]
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    //security_groups = ["${aws_security_group.loadBalancer.id}"]
+  }
 
-//Add https SG rule
-resource "aws_security_group_rule" "https" {
-  type              = "ingress"
-  from_port         = 443
-  to_port           = 443
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.app_sg.id
-}
+  # allow HTTP port
+  ingress {
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.lb_sg.id]
+  }
 
-//Add ssh SG rule
-resource "aws_security_group_rule" "ssh" {
-  type              = "ingress"
-  from_port         = 22
-  to_port           = 22
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.app_sg.id
-}
+  # allow port 3000
+  ingress {
+    from_port       = 3000
+    to_port         = 3000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.lb_sg.id]
+  }
 
-//Add localhost SG rule
-resource "aws_security_group_rule" "localhost" {
-  type              = "ingress"
-  from_port         = 3000
-  to_port           = 3000
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.app_sg.id
-}
+  # allow outbound traffic 
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
-resource "aws_security_group_rule" "outbound" {
-  type              = "egress"
-  from_port         = 0
-  to_port           = 0
-  protocol          = "-1"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.app_sg.id
+  tags = {
+    Name = "application"
+  }
 }
 
 #Create database security group
@@ -326,6 +313,7 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role = aws_iam_role.EC2-CSYE6225.name
 }
 
+#Create ASG Launch Configuration for ASG
 resource "aws_launch_configuration" "asg_launch_config" {
   name                        = "asg_launch_config"
   image_id                    = data.aws_ami.ami.id
@@ -351,6 +339,8 @@ resource "aws_launch_configuration" "asg_launch_config" {
       sudo touch check.txt
         EOF
 }
+
+#Create Auto Scaling Group
 resource "aws_autoscaling_group" "asg" {
   name                 = "asg"
   desired_capacity     = 3
@@ -367,6 +357,7 @@ resource "aws_autoscaling_group" "asg" {
   }
 }
 
+#ASG Policy to Scale Up by one instance
 resource "aws_autoscaling_policy" "ASG_Scale_Up_Policy" {
   name                   = "ASG_Scale_Up_Policy"
   scaling_adjustment     = 1
@@ -375,6 +366,7 @@ resource "aws_autoscaling_policy" "ASG_Scale_Up_Policy" {
   autoscaling_group_name = aws_autoscaling_group.asg.name
 }
 
+#ASG Policy to Scale Down by one instance
 resource "aws_autoscaling_policy" "ASG_Scale_Down_Policy" {
   name                   = "ASG_Scale_Down_Policy"
   scaling_adjustment     = -1
@@ -383,6 +375,7 @@ resource "aws_autoscaling_policy" "ASG_Scale_Down_Policy" {
   autoscaling_group_name = aws_autoscaling_group.asg.name
 }
 
+#ASG Security Group for Load Balancer
 resource "aws_security_group" "lb_sg" {
   name   = "Application Load Balancer Security Group"
   vpc_id = aws_vpc.main.id
@@ -405,6 +398,7 @@ resource "aws_security_group" "lb_sg" {
   }
 }
 
+#Load Balancer to Manage ASG Instances
 resource "aws_lb" "load_balancer" {
   name               = "Application-Load-Balancer"
   internal           = false
@@ -417,6 +411,7 @@ resource "aws_lb" "load_balancer" {
   }
 }
 
+#Load Balancer Target Group for Endpoint
 resource "aws_lb_target_group" "lb_target_grp" {
   name     = "ALB-Target-Group"
   port     = "3000"
@@ -424,6 +419,7 @@ resource "aws_lb_target_group" "lb_target_grp" {
   vpc_id   = aws_vpc.main.id
 }
 
+#Load Balancer to listen to HTTP Traffic
 resource "aws_lb_listener" "lb_listener" {
   load_balancer_arn = aws_lb.load_balancer.arn
   port              = "80"
@@ -435,6 +431,7 @@ resource "aws_lb_listener" "lb_listener" {
   }
 }
 
+#Cloudwatch Alarm for Scale Down on Low Usage
 resource "aws_cloudwatch_metric_alarm" "CPU_Usage_Low" {
   alarm_name          = "CPU-Usage-Low"
   comparison_operator = "LessThanThreshold"
@@ -453,6 +450,7 @@ resource "aws_cloudwatch_metric_alarm" "CPU_Usage_Low" {
   alarm_actions     = [aws_autoscaling_policy.ASG_Scale_Down_Policy.arn]
 }
 
+#Cloudwatch Alarm for Scale Up on High Usage
 resource "aws_cloudwatch_metric_alarm" "CPU_Usage_High" {
   alarm_name          = "CPU-Usage-High"
   comparison_operator = "GreaterThanThreshold"
@@ -470,11 +468,3 @@ resource "aws_cloudwatch_metric_alarm" "CPU_Usage_High" {
   alarm_description = "Scales up if CPU Usage above 5%"
   alarm_actions     = [aws_autoscaling_policy.ASG_Scale_Up_Policy.arn]
 }
-
-// resource "aws_autoscaling_lifecycle_hook" "asg_lh" {
-//   name                   = "ASG-Lifecycle-Hook"
-//   autoscaling_group_name = aws_autoscaling_group.asg.name
-//   default_result         = "CONTINUE"
-//   heartbeat_timeout      = 300
-//   lifecycle_transition   = "autoscaling:EC2_INSTANCE_LAUNCHING"
-// }
