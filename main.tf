@@ -187,25 +187,28 @@ resource "aws_db_subnet_group" "db_sntg" {
 
 #Create RDS Instance
 resource "aws_db_instance" "db_instance" {
-  allocated_storage      = 10
-  engine                 = var.db_engine
-  instance_class         = var.db_iclass
-  name                   = var.db_name
-  username               = var.db_user
-  password               = var.db_pass
-  identifier             = var.db_id
-  parameter_group_name   = aws_db_parameter_group.db_pg.id
-  multi_az               = true
-  db_subnet_group_name   = aws_db_subnet_group.db_sntg.name
-  vpc_security_group_ids = [aws_security_group.db_sg.id]
-  skip_final_snapshot    = true
+  allocated_storage       = 10
+  engine                  = var.db_engine
+  instance_class          = var.db_iclass
+  name                    = var.db_name
+  username                = var.db_user
+  password                = var.db_pass
+  identifier              = var.db_id
+  backup_retention_period = 1
+  apply_immediately       = "true"
+  parameter_group_name    = aws_db_parameter_group.db_pg.id
+  multi_az                = true
+  db_subnet_group_name    = aws_db_subnet_group.db_sntg.name
+  vpc_security_group_ids  = [aws_security_group.db_sg.id]
+  skip_final_snapshot     = true
 }
 
 #Create RDS Read Replica Instance
-resource "aws_db_instance" "db_instance" {
-  replicate_source_db = aws_db_instance.db_instance.id
+resource "aws_db_instance" "db_read_replica" {
+  replicate_source_db    = aws_db_instance.db_instance.id
   vpc_security_group_ids = [aws_security_group.db_sg.id]
-  identifier             = var.db_id
+  identifier             = var.db_rr_id
+  instance_class         = var.db_iclass
   multi_az               = true
   skip_final_snapshot    = true
 }
@@ -476,14 +479,4 @@ resource "aws_cloudwatch_metric_alarm" "CPU_Usage_High" {
 
   alarm_description = "Scales up if CPU Usage above 5%"
   alarm_actions     = [aws_autoscaling_policy.ASG_Scale_Up_Policy.arn]
-}
-
-#SNS Topic Creation
-resource "aws_sns_topic" "sns_topic_lambda" {
-  name = "CSYE6225 SNS Topic"
-}
-
-resource "aws_sns_topic_policy" "sns_topic_lambda" {
-  arn    = "${aws_sns_topic.sns_topic_lambda.arn}"
-  policy = "${data.aws_iam_policy_document.sns-topic-policy.json}"
 }

@@ -107,6 +107,7 @@ variable "db_name" {}
 variable "db_user" {}
 variable "db_pass" {}
 variable "db_id" {}
+variable "db_rr_id" {}
 
 variable "db_param_gp" {
   default = "default.mysql8.0"
