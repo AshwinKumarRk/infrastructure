@@ -627,7 +627,7 @@ resource "aws_iam_policy" "EC2_DynamoDB_policy" {
  EOF
 }
 
-resource "aws_iam_role_policy_attachment" "Attach_DynamoDB_To_EC@_Policy" {
+resource "aws_iam_role_policy_attachment" "Attach_DynamoDB_To_EC2_Policy" {
   role       = aws_iam_role.CSYEEC2-6225.name
   policy_arn = aws_iam_policy.EC2_DynamoDB_policy.arn
 }
