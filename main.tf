@@ -628,7 +628,7 @@ resource "aws_iam_policy" "EC2_DynamoDB_policy" {
 }
 
 resource "aws_iam_role_policy_attachment" "Attach_DynamoDB_To_EC2_Policy" {
-  role       = aws_iam_role.CSYEEC2-6225.name
+  role       = aws_iam_role.EC2-CSYE6225.name
   policy_arn = aws_iam_policy.EC2_DynamoDB_policy.arn
 }
 
@@ -729,7 +729,7 @@ resource "aws_iam_user_policy_attachment" "ghAction_lambda_policy_attach" {
 # Attaching SNS policy to the EC2 role
 resource "aws_iam_role_policy_attachment" "ec2_sns" {
   policy_arn = aws_iam_policy.sns_iam_policy.arn
-  role       = aws_iam_role.CSYEEC2-6225.name
+  role       = aws_iam_role.EC2-CSYE6225.name
 }
 
 data "archive_file" "lambda_zip" {
