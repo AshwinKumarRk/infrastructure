@@ -606,6 +606,32 @@ resource "aws_dynamodb_table" "dynamodb-table" {
 
 }
 
+//IAM policy to allow DynamoDB Read Access
+resource "aws_iam_policy" "EC2_DynamoDB_policy" {
+  name        = "EC2_DynamoDB_policy"
+  description = "Policy for EC2 to call DynamoDB"
+  policy      = <<EOF
+{
+   "Version": "2012-10-17",
+   "Statement": [
+       {
+         "Sid": "EC2DynamoDBAccess",
+         "Effect": "Allow",
+         "Action": [
+             "dynamodb:GetItem"
+         ],
+         "Resource": "arn:aws:dynamodb:${var.region}:${var.accountID}:table/csye6225"
+       }
+   ]
+}
+ EOF
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_role_policy_attach" {
+  role       = aws_iam_role.CSYEEC2-6225.name
+  policy_arn = aws_iam_policy.EC2_DynamoDB_policy.arn
+}
+
 #Lambda Policy
 resource "aws_iam_policy" "lambda_policy" {
   name        = "lambda_policy"
@@ -703,7 +729,7 @@ resource "aws_iam_user_policy_attachment" "ghAction_lambda_policy_attach" {
 # Attaching SNS policy to the EC2 role
 resource "aws_iam_role_policy_attachment" "ec2_sns" {
   policy_arn = aws_iam_policy.sns_iam_policy.arn
-  role       = aws_iam_role.EC2-CSYE6225.name
+  role       = aws_iam_role.CSYEEC2-6225.name
 }
 
 data "archive_file" "lambda_zip" {
