@@ -198,7 +198,7 @@ resource "aws_db_instance" "db_instance" {
   apply_immediately       = "true"
   parameter_group_name    = aws_db_parameter_group.db_pg.id
   db_subnet_group_name    = aws_db_subnet_group.db_sntg.name
-  availability_zone = var.subnet_az[0]
+  availability_zone       = var.subnet_az[0]
   vpc_security_group_ids  = [aws_security_group.db_sg.id]
   skip_final_snapshot     = true
 }
@@ -208,7 +208,7 @@ resource "aws_db_instance" "db_read_replica" {
   replicate_source_db    = aws_db_instance.db_instance.id
   vpc_security_group_ids = [aws_security_group.db_sg.id]
   identifier             = var.db_rr_id
-  availability_zone = var.subnet_az[1]
+  availability_zone      = var.subnet_az[1]
   instance_class         = var.db_iclass
   skip_final_snapshot    = true
 }
@@ -531,8 +531,8 @@ data "aws_iam_policy_document" "sns_topic_policy" {
 }
 
 resource "aws_sns_topic_policy" "sns_topic_lambda_policy" {
-  arn    = "${aws_sns_topic.sns_topic_lambda.arn}"
-  policy = "${data.aws_iam_policy_document.sns_topic_policy.json}"
+  arn    = aws_sns_topic.sns_topic_lambda.arn
+  policy = data.aws_iam_policy_document.sns_topic_policy.json
 }
 
 # IAM policy for SNS
@@ -556,10 +556,10 @@ EOF
 resource "aws_lambda_function" "sns_lambda_email" {
   filename         = "serverless_artifact.zip"
   function_name    = "lambda_function_name"
-  role             = "${aws_iam_role.iam_for_lambda.arn}"
+  role             = aws_iam_role.iam_for_lambda.arn
   handler          = "index.handler"
   runtime          = "nodejs12.x"
-  source_code_hash = "${data.archive_file.lambda_zip.output_base64sha256}"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
   environment {
     variables = {
       timeToLive = "5"
@@ -569,18 +569,18 @@ resource "aws_lambda_function" "sns_lambda_email" {
 
 #SNS topic subscription to Lambda
 resource "aws_sns_topic_subscription" "lambda" {
-  topic_arn = "${aws_sns_topic.sns_topic_lambda.arn}"
+  topic_arn = aws_sns_topic.sns_topic_lambda.arn
   protocol  = "lambda"
-  endpoint  = "${aws_lambda_function.sns_lambda_email.arn}"
+  endpoint  = aws_lambda_function.sns_lambda_email.arn
 }
 
 #SNS Lambda Permission
 resource "aws_lambda_permission" "with_sns" {
   statement_id  = "AllowExecutionFromSNS"
   action        = "lambda:InvokeFunction"
-  function_name = "${aws_lambda_function.sns_lambda_email.function_name}"
+  function_name = aws_lambda_function.sns_lambda_email.function_name
   principal     = "sns.amazonaws.com"
-  source_arn    = "${aws_sns_topic.sns_topic_lambda.arn}"
+  source_arn    = aws_sns_topic.sns_topic_lambda.arn
 }
 
 #Create DynamoDB
@@ -671,8 +671,8 @@ EOF
 
 #Attach the policy for Lambda iam role
 resource "aws_iam_role_policy_attachment" "lambda_role_policy_attach" {
-  role       = "${aws_iam_role.iam_for_lambda.name}"
-  policy_arn = "${aws_iam_policy.lambda_policy.arn}"
+  role       = aws_iam_role.iam_for_lambda.name
+  policy_arn = aws_iam_policy.lambda_policy.arn
 }
 
 resource "aws_iam_policy" "ghAction-Lambda" {
@@ -697,13 +697,13 @@ EOF
 #Lambda Policy
 resource "aws_iam_user_policy_attachment" "ghAction_lambda_policy_attach" {
   user       = "ghactions-app"
-  policy_arn = "${aws_iam_policy.ghAction-Lambda.arn}"
+  policy_arn = aws_iam_policy.ghAction-Lambda.arn
 }
 
 # Attaching SNS policy to the EC2 role
 resource "aws_iam_role_policy_attachment" "ec2_sns" {
-  policy_arn = "${aws_iam_policy.sns_iam_policy.arn}"
-  role       = "${aws_iam_role.EC2-CSYE6225.name}"
+  policy_arn = aws_iam_policy.sns_iam_policy.arn
+  role       = aws_iam_role.EC2-CSYE6225.name
 }
 
 data "archive_file" "lambda_zip" {
