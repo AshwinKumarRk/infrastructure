@@ -595,6 +595,11 @@ resource "aws_dynamodb_table" "dynamodb-table" {
     name = "id"
     type = "S"
   }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
   tags = {
     Name = "csye6225"
   }
