@@ -333,6 +333,11 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role = aws_iam_role.EC2-CSYE6225.name
 }
 
+resource "aws_kms_key" "kms_ebs" {
+  description             = "KMS key for EBS"
+  deletion_window_in_days = 1
+}
+
 #Create ASG Launch Configuration for ASG
 resource "aws_launch_configuration" "asg_launch_config" {
   name                        = "asg_launch_config"
@@ -342,6 +347,13 @@ resource "aws_launch_configuration" "asg_launch_config" {
   associate_public_ip_address = true
   iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
   security_groups             = [aws_security_group.app_sg.id]
+  root_block_device {
+    volume_size           = "20"
+    volume_type           = "gp2"
+    encrypted             = true
+    kms_key_id            = aws_kms_key.kms_ebs.key_id      
+    delete_on_termination = true
+  }
   user_data                   = <<-EOF
       #!/bin/bash
       sleep 30
