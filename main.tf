@@ -185,6 +185,12 @@ resource "aws_db_subnet_group" "db_sntg" {
   }
 }
 
+#KMS key to encrypt RDS
+resource "aws_kms_key" "kms_rds" {
+  description             = "KMS key for RDS"
+  deletion_window_in_days = 1
+}
+
 #Create RDS Instance
 resource "aws_db_instance" "db_instance" {
   allocated_storage       = 10
@@ -196,6 +202,8 @@ resource "aws_db_instance" "db_instance" {
   identifier              = var.db_id
   backup_retention_period = 1
   apply_immediately       = "true"
+  storage_encrypted = true
+  kms_key_id       = aws_kms_key.kms_rds.key_id
   parameter_group_name    = aws_db_parameter_group.db_pg.id
   db_subnet_group_name    = aws_db_subnet_group.db_sntg.name
   availability_zone       = var.subnet_az[0]
@@ -435,11 +443,17 @@ resource "aws_lb_target_group" "lb_target_grp" {
   vpc_id   = aws_vpc.main.id
 }
 
+data "aws_acm_certificate" "ssl_certificate" {
+  domain = "prod.ashwinkumarrk.me"
+  statuses = ["ISSUED"]
+}
+
 #Load Balancer to listen to HTTP Traffic
 resource "aws_lb_listener" "lb_listener" {
   load_balancer_arn = aws_lb.load_balancer.arn
-  port              = "80"
-  protocol          = "HTTP"
+  port              = "443"
+  protocol          = "HTTPS"
+  certficate_arn = data.aws_lb_listener.ssl_certificate.arn
 
   default_action {
     type             = "forward"
