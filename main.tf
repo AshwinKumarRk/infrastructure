@@ -182,6 +182,12 @@ resource "aws_s3_bucket_public_access_block" "s3_pub_accblk" {
 resource "aws_db_parameter_group" "db_pg" {
   name   = var.dbp_name
   family = var.dbp_family
+
+  parameter {
+    name  = "performance_schema"
+    value = 1
+    apply_method = "pending-reboot"
+  }
 }
 
 #Create RDS Subnet Group
