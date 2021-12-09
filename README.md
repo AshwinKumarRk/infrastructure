@@ -22,3 +22,9 @@
    ```
    terraform destroy
    ```
+
+## How to Import SSL Certificate into AWS Certificate Manager
+
+aws acm import-certificate --certificate fileb:///Users/ashwin/Desktop/prod_ashwinkumarrk_me/prod_ashwinkumarrk_me.crt   \
+      --certificate-chain fileb:///Users/ashwin/Desktop/prod_ashwinkumarrk_me/prod_ashwinkumarrk_me.ca-bundle   \
+      --private-key fileb:///Users/ashwin/Desktop/private.key --region us-east-1
