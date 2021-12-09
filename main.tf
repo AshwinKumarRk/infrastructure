@@ -64,7 +64,7 @@ resource "aws_security_group" "app_sg" {
   vpc_id = aws_vpc.main.id
   name   = "application"
 
-  # allow SSH port
+  # Allows SSH port
   ingress {
     cidr_blocks = ["0.0.0.0/0"]
     from_port   = 22
@@ -73,15 +73,23 @@ resource "aws_security_group" "app_sg" {
     //security_groups = ["${aws_security_group.loadBalancer.id}"]
   }
 
-  # allow HTTP port
+  # Allows HTTP port
+  // ingress {
+  //   from_port       = 80
+  //   to_port         = 80
+  //   protocol        = "tcp"
+  //   security_groups = [aws_security_group.lb_sg.id]
+  // }
+
+  # Allows HTTPS port
   ingress {
-    from_port       = 80
-    to_port         = 80
+    from_port       = 443
+    to_port         = 443
     protocol        = "tcp"
     security_groups = [aws_security_group.lb_sg.id]
   }
 
-  # allow port 3000
+  # Allows port 3000
   ingress {
     from_port       = 3000
     to_port         = 3000
@@ -89,7 +97,7 @@ resource "aws_security_group" "app_sg" {
     security_groups = [aws_security_group.lb_sg.id]
   }
 
-  # allow outbound traffic 
+  # Allows outbound traffic 
   egress {
     from_port   = 0
     to_port     = 0
@@ -188,7 +196,7 @@ resource "aws_db_subnet_group" "db_sntg" {
 #KMS key to encrypt RDS
 resource "aws_kms_key" "kms_rds" {
   description             = "KMS key for RDS"
-  deletion_window_in_days = 1
+  deletion_window_in_days = 7
 }
 
 #Create RDS Instance
@@ -203,7 +211,7 @@ resource "aws_db_instance" "db_instance" {
   backup_retention_period = 1
   apply_immediately       = "true"
   storage_encrypted = true
-  kms_key_id       = aws_kms_key.kms_rds.key_id
+  kms_key_id       = aws_kms_key.kms_rds.arn
   parameter_group_name    = aws_db_parameter_group.db_pg.id
   db_subnet_group_name    = aws_db_subnet_group.db_sntg.name
   availability_zone       = var.subnet_az[0]
@@ -333,9 +341,77 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role = aws_iam_role.EC2-CSYE6225.name
 }
 
+#IAM policy to allows KMS permissions to encrypt EBS Volumes
+data "aws_iam_policy_document" "kms_ebs_encrypt_policy" {
+  statement {
+    sid = "1"
+    effect = "Allow"
+    actions = [
+       "kms:Encrypt",
+       "kms:Decrypt",
+       "kms:ReEncrypt*",
+       "kms:GenerateDataKey*",
+       "kms:DescribeKey"
+    ]
+    principals {
+      type        = "AWS"
+      identifiers = [
+        "arn:aws:iam::101014783999:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling",
+        "arn:aws:iam::101014783999:root"
+      ]
+    }
+    resources = [
+      "*",
+    ]
+  }
+  statement {
+    sid = "2"
+    effect = "Allow"
+    actions = [
+                "kms:Create*",
+                      "kms:Describe*",
+                      "kms:Enable*",
+                      "kms:List*",
+                      "kms:Put*",
+                      "kms:Update*",
+                      "kms:Revoke*",
+                      "kms:Disable*",
+                      "kms:Get*",
+                      "kms:Delete*",
+                      "kms:ScheduleKeyDeletion",
+                      "kms:CancelKeyDeletion"    ]
+    principals {
+      type        = "AWS"
+      identifiers = [
+        "arn:aws:iam::101014783999:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling",
+        "arn:aws:iam::101014783999:root"
+      ]
+    }
+    resources = [
+      "*",
+    ]
+  }
+}
+
+//Customer created key to encrypt EBS Volumes
 resource "aws_kms_key" "kms_ebs" {
   description             = "KMS key for EBS"
-  deletion_window_in_days = 1
+  policy = data.aws_iam_policy_document.kms_ebs_encrypt_policy.json
+  enable_key_rotation = true
+  depends_on = [data.aws_iam_policy_document.kms_ebs_encrypt_policy]
+}
+
+// resource "aws_kms_grant" "kms_ebs_grant" {
+//   name              = "KMS_Grant_for_EBS"
+//   key_id            = aws_kms_key.kms_ebs.key_id
+//   grantee_principal = aws_iam_role.EBS_Role.arn
+//   operations        = ["Encrypt", "Decrypt", "GenerateDataKey"]
+// }
+
+//Set default KMS key to the Customer created key
+resource "aws_ebs_default_kms_key" "ebs_default_kms" {
+  key_arn = aws_kms_key.kms_ebs.arn
+  depends_on = [aws_kms_key.kms_ebs]
 }
 
 #Create ASG Launch Configuration for ASG
@@ -350,8 +426,7 @@ resource "aws_launch_configuration" "asg_launch_config" {
   root_block_device {
     volume_size           = "20"
     volume_type           = "gp2"
-    encrypted             = true
-    kms_key_id            = aws_kms_key.kms_ebs.key_id      
+    encrypted             = true    
     delete_on_termination = true
   }
   user_data                   = <<-EOF
@@ -416,12 +491,20 @@ resource "aws_security_group" "lb_sg" {
   name   = "Application Load Balancer Security Group"
   vpc_id = aws_vpc.main.id
 
+  // ingress {
+  //   from_port   = 80
+  //   to_port     = 80
+  //   protocol    = "tcp"
+  //   cidr_blocks = ["0.0.0.0/0"]
+  // }
+
   ingress {
-    from_port   = 80
-    to_port     = 80
+    from_port   = 443
+    to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -455,6 +538,7 @@ resource "aws_lb_target_group" "lb_target_grp" {
   vpc_id   = aws_vpc.main.id
 }
 
+#SSL certificate for domain name in Route53
 data "aws_acm_certificate" "ssl_certificate" {
   domain = "prod.ashwinkumarrk.me"
   statuses = ["ISSUED"]
@@ -465,7 +549,7 @@ resource "aws_lb_listener" "lb_listener" {
   load_balancer_arn = aws_lb.load_balancer.arn
   port              = "443"
   protocol          = "HTTPS"
-  certficate_arn = data.aws_lb_listener.ssl_certificate.arn
+  certificate_arn = data.aws_acm_certificate.ssl_certificate.arn
 
   default_action {
     type             = "forward"
@@ -587,7 +671,7 @@ resource "aws_lambda_function" "sns_lambda_email" {
   role             = aws_iam_role.iam_for_lambda.arn
   handler          = "index.handler"
   runtime          = "nodejs12.x"
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  source_code_hash = data.archive_file.dummy_lambda.output_base64sha256
   environment {
     variables = {
       timeToLive = "5"
@@ -612,7 +696,7 @@ resource "aws_lambda_permission" "with_sns" {
 }
 
 //Fetch the dummy file for lambda function
-data "archive_file" "lambda_zip" {
+data "archive_file" "dummy_lambda" {
   type        = "zip"
   source_file = "index.js"
   output_path = "serverless_artifact.zip"
@@ -737,8 +821,8 @@ resource "aws_iam_role_policy_attachment" "lambda_role_policy_attach" {
   policy_arn = aws_iam_policy.lambda_policy.arn
 }
 
-resource "aws_iam_policy" "ghAction-Lambda" {
-  name   = "ghAction_s3_policy_lambda"
+#Lambda Policy for allowing access to Lambda Function Execution
+resource "aws_iam_policy" "Lambda_Access_Policy" {
   policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -757,13 +841,13 @@ EOF
 }
 
 #Lambda Policy for ghactions for updating Lambda function from GitHub
-resource "aws_iam_user_policy_attachment" "ghAction_lambda_policy_attach" {
+resource "aws_iam_user_policy_attachment" "Attach_Lambda_Policy_To_GHActions" {
   user       = "ghactions-app"
-  policy_arn = aws_iam_policy.ghAction-Lambda.arn
+  policy_arn = aws_iam_policy.Lambda_Access_Policy.arn
 }
 
 # Attaching SNS policy to the EC2 role
-resource "aws_iam_role_policy_attachment" "ec2_sns" {
+resource "aws_iam_role_policy_attachment" "Attach_SNS_Policy_To_EC2Role" {
   policy_arn = aws_iam_policy.sns_iam_policy.arn
   role       = aws_iam_role.EC2-CSYE6225.name
 }
